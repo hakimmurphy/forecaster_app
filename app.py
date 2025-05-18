@@ -1,86 +1,145 @@
 import streamlit as st
+import datetime
 import pandas as pd
-import numpy as np
+import pickle
+import os
 import matplotlib.pyplot as plt
-import tensorflow
-from tensorflow.keras.models import load_model
 
-# Load the trained model
-model = load_model('receipt_forecast_model.h5')
+# Columns used during model training
+TRAIN_COLUMNS = [
+    'id', 'store_nbr', 'item_nbr', 'z_score', 'is_outlier',
+    'day_of_week', 'month', 'day', 'year', 'is_weekend',
+    'lag_1', 'lag_7', 'lag_30', 'rolling_mean_7',
+    'rolling_std_7', 'unit_sales_7d_avg'
+]
 
-month_dict = {
-    "January" : 1, "February":2 , "March":3 , "April":4, "May":5, "June":6, 
-    "July":7, "August":8, "September":9, "October":10, "November":11, "December":12
-}
+# File paths
+current_dir = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(current_dir, 'xgboost_features.csv')
+MODEL_PATH = os.path.join(current_dir, 'XGBoost.pkl')
 
-def get_key(dictionary, target_value):
-    return [key for key, value in dictionary.items() if value == target_value][0]
+# Load data from CSV
+@st.cache_data
+def load_data(data_path):
+    df = pd.read_csv(data_path)
+    df['date'] = pd.to_datetime(df['date'])
+    return df
+
+# Preprocess user input
+def preprocess_input_data(df, store_id, item_id, date):
+    input_data = df[
+        (df['store_nbr'] == store_id) &
+        (df['item_nbr'] == item_id) &
+        (df['date'] == pd.to_datetime(date))
+    ]
+
+    if input_data.empty:
+        return pd.DataFrame()
+
+    features = input_data.drop(columns=['unit_sales', 'date'])
+    features = features[[col for col in TRAIN_COLUMNS if col in features.columns]]
+    return features
+
+# Load trained model
+def load_model(model_path):
+    with open(model_path, 'rb') as f:
+        model = pickle.load(f)
+    return model
+
+# Run prediction with correct features
+def predict(model, input_data):
+    input_data = input_data[TRAIN_COLUMNS]
+    prediction = model.predict(input_data)
+    return prediction[0] if len(prediction) > 0 else None
+
+# Plot sales history and forecast
+def plot_prediction(df, store_id, item_id, forecast_date, forecast_value):
+    # Filter past sales data for the selected item/store
+    history = df[
+        (df['store_nbr'] == store_id) &
+        (df['item_nbr'] == item_id) &
+        (df['date'] < pd.to_datetime(forecast_date))
+    ][['date', 'unit_sales']].sort_values('date')
+
+    # Debug info
+    st.write("Last few actual sales:")
+    st.write(history.tail())
+
+    # Append forecast to the data
+    future_row = pd.DataFrame({
+        'date': [pd.to_datetime(forecast_date)],
+        'unit_sales': [forecast_value]
+    })
+    forecast_df = pd.concat([history, future_row], ignore_index=True)
+
+    # X-axis range for debug
+    # st.write("X-axis range:", forecast_df['date'].min(), "to", forecast_df['date'].max())
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(forecast_df['date'], forecast_df['unit_sales'], marker='o', label='Unit Sales')
+    ax.axvline(pd.to_datetime(forecast_date), color='green', linestyle='--', label='Forecast Date')
+    
+    # Make red dot visible and prominent
+    ax.scatter(forecast_date, forecast_value, color='red', s=50, zorder=5, label='Forecasted Sale')
+
+    # Fix y-axis scaling to include forecast point
+    max_val = max(forecast_df['unit_sales'].max(), forecast_value)
+    ax.set_ylim(bottom=0, top=max_val * 1.1)
+
+    # Final formatting
+    ax.set_title(f"Sales History + Forecast for Item {item_id} at Store {store_id}")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Unit Sales")
+    ax.legend()
+    ax.tick_params(axis='x', rotation=45)
+    fig.tight_layout()
+
+    # Display chart
+    st.pyplot(fig)
 
 
-st.set_option('deprecation.showPyplotGlobalUse', False)
+#  Main Streamlit app
+def main():
+    st.title("Corporación Favorita Sales Forecasting")
 
-st.write("""
-# Fetch Rewards: Monthly Receipt Count Forecaster
-*Monthly Receipt Counts in the year 2021*
-""")
+    df = load_data(DATA_PATH)
+    model = load_model(MODEL_PATH)
 
-# Load the data
-data_daily = pd.read_csv("data_daily.csv")
-data_daily['# Date'] = pd.to_datetime(data_daily['# Date'])
-data_monthly = data_daily.groupby(data_daily['# Date'].dt.to_period("M"))['Receipt_Count'].sum().reset_index()
-data_monthly.columns = ['Month', 'Receipt_Count']
+    # User inputs
+    store_id = st.selectbox("Store", sorted(df['store_nbr'].unique()))
+    item_id = st.selectbox("Item", sorted(df['item_nbr'].unique()))
 
-# Convert 'Month' column to string for visualization purposes
-data_monthly['Month'] = data_monthly['Month'].astype(str)
+    default_date = datetime.date(2014, 3, 1)
+    min_date = df['date'].min().date()
+    max_date = df['date'].max().date()
+    date = st.date_input("Forecast Date", value=default_date, min_value=min_date, max_value=max_date)
 
-max_val = data_monthly['Receipt_Count'].max()
-min_val = data_monthly['Receipt_Count'].min()
-data_normalized = (data_monthly['Receipt_Count'] - min_val) / (max_val - min_val)
+    # Generate forecast
+    if st.button("Get Forecast"):
+        input_data = preprocess_input_data(df, store_id, item_id, date)
+        if not input_data.empty:
+            prediction = predict(model, input_data)
+            if prediction is not None:
+                st.success(f"Predicted Sales for {date}: {prediction:.2f}")
 
-# Initialize the forecast with the last sequence from the training data
-forecast = data_normalized[-3:].tolist()
-# Create columns for side-by-side layout
-col1, col2 = st.columns(2)
+                # ✅ Forecast Summary Table
+                prediction_row = pd.DataFrame({
+                    "Forecast Date": [date],
+                    "Store": [store_id],
+                    "Item": [item_id],
+                    "Predicted Sales": [round(prediction, 2)]
+                })
+                st.subheader("📋 Forecast Summary")
+                st.dataframe(prediction_row)
 
-# In the first column, display the plot
-with col1:
-    # Create the plot
-    plt.figure(figsize=(6, 6))
-    plt.plot(data_monthly['Month'], data_monthly['Receipt_Count'], marker='o', linestyle='-')
-    plt.title('Monthly Receipt Counts for 2021')
-    plt.xlabel('Month')
-    plt.ylabel('Receipt Count')
-    plt.grid(True)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+                # Forecast chart
+                plot_prediction(df, store_id, item_id, date, prediction)
+            else:
+                st.warning("Prediction could not be generated.")
+        else:
+            st.warning("No data found for the selected inputs.")
 
-    # Display the plot in Streamlit
-    st.pyplot()
-
-# In the second column, display the data_monthly table
-with col2:
-    st.write(data_monthly)
-
-
-with st.sidebar:
-    st.title("2022 Monthly Receipt Count Forecaster: ")
-    st.markdown("---")
-    st.write("*How it works:*")
-    st.write("when you select a Month in 2022, the forecaster will predict all the Receipt counts from January to the selected month")
-    st.write("*Note:* By default January 2022 is selected and its prediction is given")
-    st.markdown("---")
-    month = st.selectbox("Select Month in 2022 to forecast:", ["January", "February", "March", "April", "May", "June", 
-                                           "July", "August", "September", "October", "November", "December"])
-    # Predict next 12 months
-    for _ in range(month_dict[month]):
-        next_seq = model.predict(np.array([forecast[-3:]]))[0][0]
-        forecast.append(next_seq)
-
-    # Extract only the forecasted 12 months
-    forecasted_values = forecast[-month_dict[month]:]
-
-    # Denormalize the forecasted data
-    forecast_denorm = np.array(forecasted_values) * (max_val - min_val) + min_val
-
-    for i, value in enumerate(forecast_denorm):
-        st.write("{}'s receipt count = {:.0f}".format(get_key(month_dict, i+1), value))
+# Entry point
+if __name__ == "__main__":
+    main()
