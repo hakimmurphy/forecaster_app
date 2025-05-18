@@ -1,24 +1,26 @@
 # 🛒 Forecaster-App — Corporación Favorita (Grocery Sales, Guayas)
 
 **Live demo »** <https://forecasterapp-re6sa3sspcdsceht7piq9s.streamlit.app/>  
-**GitHup Repo »** <https://github.com/hakimmurphy/time_series_corporacion/>
+**GitHub repo »** <https://github.com/hakimmurphy/time_series_corporacion/>
 
-Forecast daily unit-sales for any item–store pair in Guayas province using a tuned XGBoost model.  
-No local setup needed — just click the link and start exploring.
+* Prototype lets you **browse historical sales from 1 Jan 2013 onward** and  
+  **generate forecasts only for dates between 1 Jan 2014 and 31 Mar 2014**.  
+  Powered by a tuned XGBoost model and hosted on Streamlit Community Cloud—no local setup needed.
 
 ---
 
 ## 🚀 How the App Works
 
 1. **Pick a store and item** from the dropdowns.  
-2. **Choose a forecast date** (calendar limited to 2013-01-01 → 2014-03-31 in this prototype).  
-3. Click **“Get Forecast”**.  
-   * You’ll see:  
-     * predicted sales for the selected date,  
-     * a summary table,  
-     * a line chart of historical sales with the forecast point highlighted.
+2. **Select a date**—the calendar shows 2013-01-01 → 2014-03-31,  
+   but forecast output is produced **only for 2014-01-01 → 2014-03-31**.  
+3. Click **“Get Forecast”** to see:  
+   * predicted sales for that date,  
+   * a summary table,  
+   * a line chart with historical sales and the forecast point.
 
-Everything runs server-side on Streamlit Community Cloud; nothing to install.
+Everything runs server-side on Streamlit Cloud; just open the link and use.
 
 ---
+
 
