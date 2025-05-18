@@ -1,20 +1,24 @@
-# Forecaster-app
-The app can be accessed with the following link: https://forecaster-app-lhdlo22sdhvfdoipcwn5vi.streamlit.app/
+# 🛒 Forecaster-App — Corporación Favorita (Grocery Sales, Guayas)
 
-# How it works
-No setup of any kind is needed to run the app. The app is hosted on streamlit community cloud, click on the above link and start making forecasting for the year 2022.
+**Live demo »** <https://forecasterapp-re6sa3sspcdsceht7piq9s.streamlit.app/>  
+**GitHup Repo »** <https://github.com/hakimmurphy/time_series_corporacion/>
 
-# Project Overview
-The data daily.csv file provides the number of the observed scanned receipts each day for the year 2021. Based on this prior knowledge, I have developed an Deep Learning algorithm which can predict the approximate number of the scanned receipts for each month of 2022.
+Forecast daily unit-sales for any item–store pair in Guayas province using a tuned XGBoost model.  
+No local setup needed — just click the link and start exploring.
 
-# Model Training
-I have trained a Tensorflow model in google colab environment that predict the approximate number of scanned receipts for each month of 2022.
-Detailed description of model development with the code can be accessed using the following link:
-https://colab.research.google.com/drive/1rxeO_y3vENw5-d-_ONb5R0RUfIEefLGw?usp=sharing
+---
 
-### Note
-If you are trying to reproduce the model in colab, please download the data_daily.csv file and upload it in the colab to reproduce the model. An alternate method to test the app locally without using the **Forecaster-app**:  
-1. clone the repository and create a virtual environment in python
-2. install all the required libraries using **requirements.txt**
-3. run the following command: **streamlit run app.py**
-4. This will open a webpage, where you can forecast predictions for each month of 2022 
+## 🚀 How the App Works
+
+1. **Pick a store and item** from the dropdowns.  
+2. **Choose a forecast date** (calendar limited to 2013-01-01 → 2014-03-31 in this prototype).  
+3. Click **“Get Forecast”**.  
+   * You’ll see:  
+     * predicted sales for the selected date,  
+     * a summary table,  
+     * a line chart of historical sales with the forecast point highlighted.
+
+Everything runs server-side on Streamlit Community Cloud; nothing to install.
+
+---
+
